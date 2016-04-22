@@ -1,0 +1,291 @@
+Article for Linux For You
+
+Title: How Knoppix saved our day
+
+Subtitle: Using Knoppix to recover from a Linux system crash
+
+Author: Vasudev Ram (vasudevram@gmail.com)
+
+1. Introduction:
+
+This  article describes  some  techniques, used  in a  real-life
+incident, that  can help you  recover your Linux system  after a
+crash. Apart  from the specific  steps used in the  recovery, it
+also gives some information and troubleshooting tips that can be
+used in similar scenarios.
+
+2. The crash:
+
+Recently, one evening,  I got an urgent call from  a client. His
+Linux system (a  PC running Red Hat 7.3) would  not boot. It had
+been working  fine just a short  while earlier, till he  shut it
+down.
+
+2.1 The problem description:
+
+He had  a dual-boot system  (Linux and Windows)  configured with
+GRUB  as the  boot loader.  GRUB stands  for GRand  Unified Boot
+loader; a boot loader is  a software component that gets control
+of the machine  just after the BIOS, and typically  allows you a
+choice  of which  operating  system  to boot,  when  you have  a
+dual- or  multiple-boot system, i.e. multiple  operating systems
+installed in separate disk partitions.
+
+GRUB is an alternative boot  loader, developed later than LILO (
+the LInux LOader,  which used to be the default  boot loader for
+Linux). It  has some features that  LILO does not have,  so some
+people prefer using it to  LILO. Most modern Linux distros allow
+you to  select either LILO or  GRUB as your chosen  boot loader.
+Read more about GRUB in a prior LFY article.
+
+Under normal conditions, after the system BIOS boot-up messages,
+it used to display the GRUB boot menu, which allowed a choice of
+which OS to boot - Linux or Windows.
+
+But now, it halted at the  GRUB prompt, and gave a message about
+booting from a CD. It did not  seem to recognize that any OS was
+installed  on  the hard  disk.  And,  of course,  the  data-loss
+version of Murphy's Law applied here: "a system crash will occur
+when you have important data with no backup" :-). He had none.
+
+2.2 The importance of backups:
+
+Never treat  backups lightly - unless  your data and time  is of
+such  little  value  that  you  can afford  to  spend  the  time
+recreating it. In some cases,  recreation may not be possible at
+all. There are multiple options  available in Linux for backups,
+including  simple copying  to a  floppy, tape  or other  device,
+commands  like  tar (Tape  ARchiver)  and  cpio (CoPy  Input  to
+Output),  which  come  with  all  Linux  versions,  as  well  as
+third-party open-source as well as proprietary tools.
+
+If you are using Linux for anything other casual learning / use,
+and you want to avoid problems, do ensure that you have a proper
+backup  plan in  place,  and that  it  is followed  religiously.
+Invest some time in learning about backup tools and techniques -
+the time  will be paid  back manyfold when  you have a  crash or
+lose some data. It's a fairly large topic - more information and
+a guide to it may be the subject of a future article.
+
+3. The recovery:
+
+I put  the LFY  Knoppix CD  in the CD-ROM  drive and  booted the
+machine. Knoppix came up very fast, in just about 2 minutes.
+
+The first step  was to try to mount the  existing hard disk file
+systems.
+
+3.1 About mounting, partitions, and file systems:
+
+Mounting  a  file  system  is  done by  the  mount  command.  It
+makes  a partition  on  a  device accessible  as  a file  system
+under a  specified directory.  After mounting  a file  system on
+/mnt/abc,  for  example, users  can  access  all the  files  and
+directories under that partition via that directory; e.g. a file
+/home/mydata can now be accessed as /mnt/abc/home/mydata, and so
+on.
+
+The  partition  is referred  to  by  its  device name,  such  as
+/dev/hda5. Here /dev means  the device directory, which contains
+all the  device files.  hda means  the first  (a) IDE  hard disk
+(hd);  SCSI disks  are  denoted by  sda  and so  on;  and the  5
+represents the partition number within that disk.
+
+3.2 Finding out what could be salvaged:
+
+I was not sure which  device files represented which partitions,
+as this can vary; it is determined when you install Linux.
+
+I could  have experimented with different  device filenames, but
+that would have taken a little more time.
+
+So,  knowing that  one of  Knoppix's goals  is to  be used  as a
+rescue disk, I checked the files /etc/fstab and /etc/mtab. These
+files contain a list of file systems to mount, the partitions on
+which they exist, and the options to pass to the mount command.
+
+Normally, if booting  from a CD, the fstab file  would list only
+partitions mounted by the Linux from the CD - not the partitions
+already present on  the hard disk. But I found  that Knoppix had
+recognized the hard disk partitions and created entries for them
+in its fstab, which was, of course,  a file in the RAM disk that
+Knoppix creates when it boots. From these two files, I found the
+following mapping between partitions and mount points:
+
+/dev/hda5 /
+
+/dev/hda6 /home
+
+This told  me that  /dev/hda5 represented  the root  ( /  ) file
+sytem and /dev/hda6 was the /home file system.
+
+To confirm this further, I did:
+
+# dd < /dev/hda5 | strings | less
+
+and
+
+# dd < /dev/hda6 | strings | less
+
+(dd is a tool that has many  uses. It can read any kind of file,
+can be  used to copy  data between  hard disks and  devices, can
+convert files from ASCII to  EBCDID, do byte-swappping, read and
+write in different block sizes, etc.)
+
+The above  pipeline calls  dd, filters  it's output  through the
+strings command (which outputs only ASCII printable characters),
+and pipes it to the pager less.  I kept hitting ENTER at the end
+of each page;  when the client spotted some output  that he knew
+belonged to files on / and /home, this confirmed that the device
+files were the right ones.
+
+3.3 Recovering the data:
+
+So, I issued the following commands:
+
+# mkdir /mnt/tmp
+# mount /dev/hda5 /mnt/tmp
+
+# mkdir /mnt/tmp/home
+# mount /dev/hda6 /mnt/tmp/home
+
+These lines made two new directories  under /mnt,  i.e. /mnt/tmp
+and  /mnt/tmp/home, and then mounted the above partitions-  hda5
+and  hda6 - on the directories created above.
+
+(Mount is also a versatile command;  you can mount a file system
+either read-write or  read-only, mount a floppy or  a CD-ROM, an
+NFS (Network File System) partition on another machine, etc.)
+
+The mounts worked  - I heaved a sigh of  relief. This meant that
+the data was still accessible.
+
+Next, I  did a  cd to  /mnt/tmp/home/data_dir where  my client's
+important  data was.  (This  would have  been /home/data_dir  if
+accessing it  after a  normal boot  from the  Linux on  the hard
+disk).
+
+Did a few quick ls commands to ensure that all was intact.
+
+Tip: in a badly corrupted system scenario, the ls command itself
+might be missing. If  so, you can use the command  "echo *" as a
+workaround. Similarly, dd < file can be used as a substitute for
+the cat  command -  but be careful  - don't try  to dd  a binary
+file, except if  you pipe the dd  to strings - it  can hang your
+terminal  due to  the  non-ASCII (control)  characters that  get
+displayed.
+
+3.4 Mounting the Windows partitions:
+
+Then, since  his was  a dual-boot system  with both  Windows and
+Linux, the next thing was to  see if the Windows partitions were
+intact as well.
+
+His  Windows  C:  drive  was  mapped  to  /dev/hda1  and  D:  to
+/dev/hda3; again, this was confirmed with a dd command as above.
+
+So:
+
+# mkdir /mnt/tmp/win_c
+# mkdir /mnt/tmp/win_d
+
+# mount /dev/hda1 /mnt/tmp/win_c
+# mount /dev/hda3 /mnt/tmp/win_d
+
+The above commands created two  more directories and mounted the
+C:  and D:  drives on  them  - as  though they  were Linux  file
+systems.  This  is possible  because  modern  versions of  Linux
+support this feature  - they can mount FAT32  file systems. This
+features works at  all times in Linux  - you can use  it to copy
+files back and forth between your Linux and Windows file systems
+on the same hard disk, during  a Linux session. You can even use
+it to edit a file directly on the Windows partition, using vi.
+
+It's the reverse  of the explorefs tool described  in an earlier
+LFY issue, which allows you to access Linux partition files from
+a Windows session.
+
+Listed the contents of win_c and win_d - again, all was ok.
+
+3.5 Prevention is better than cure:
+
+As  a safety  measure,  write down  or take  a  printout of  the
+partition and file system information on your Linux system. This
+can  be got  from the  fstab and  mtab files  and from  the view
+partitions options  of the fdisk  or cfdisk commands -  use them
+with  care! Make  sure to  include  the start,  size (in  blocks
+or  bytes -  find  out  the block  size,  if blocks),  partition
+type (Linux  native, Linux  swap, FAT32, etc.),  partition flags
+(active,  etc.).  This  information is  invaluable  in  recovery
+situations. Also create a Linux  boot/rescue disk - most distros
+support that nowadays.
+
+Using the cp  command, I then copied his files  to newly created
+directories under  both win_c and  win_d, using commands  of the
+form:
+
+# cp -R source_dir target_dir
+
+The -R  means recursive  - it copies  all files  and directories
+under  the source_dir  to the  target_dir, preserving  directory
+structure.
+
+3.6 Be paranoid - take extra copies:
+
+Then, inserted a floppy in drive  A:, and copies the files there
+as well, using the mdir and mcopy commands:
+
+# mdir a:
+
+This showed an empty floppy disk, as expected.
+
+# mcopy -s source_dir target_dir
+
+The -s makes it recursive, like -R above.
+
+# mdir a:
+
+To check that all files were copied - they were.
+
+The floppies were taken to  another system, and copied onto it's
+hard disk. The client continued his work there.
+
+4. Conclusion:
+
+Later, we went back to the original system, and tried to boot it
+again - this  time from the hard disk.  Surprisingly, it worked.
+Over the  next day or two,  we found that it  alternated between
+booting properly  and giving  the same error  as before,  of not
+recognizing the hard disk.
+
+Diagnosis: the problem was an intermittent one - this can happen
+due to  problems with the  drive's electronics - I've  seen this
+kind of problem on systems before.
+
+Possibly  the  hard disk  was  getting  old  and about  to  fail
+permanently. In any  case, we were lucky that it  worked when we
+tried to recover  the data, and that we had  Knoppix to speed up
+the work.
+
+I've recovered data many  times from crashed UNIX/Linux systems,
+using various tricks  of the trade, but I have  to say that this
+was one  of the fastest cases  ever - largely due  to Knoppix. I
+even  reached  home in  time  for  dinner, unlike  many  earlier
+occasions :-) Knoppix is highly recommended.
+
+Resources:
+
+See the man pages for:
+    mount, fstab, dd, strings, less, tar, cpio, mdir, mcopy
+
+About the author:
+
+Vasudev Ram is an independent developer, consultant, trainer and
+writer  with many  years  of  IT experience.  He  was earlier  a
+project manager at Infosys  Technologies. He focuses (though not
+exclusively)  on open  source  technologies, such  as Linux,  C,
+Python, as  well as Java and  databases. You can contact  him at
+vasudevram@gmail.com.
+
+================================================================
+
